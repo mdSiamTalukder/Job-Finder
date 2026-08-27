@@ -1,0 +1,27 @@
+{
+  "name": "job-finder-server",
+  "version": "1.0.0",
+  "description": "JobFinder backend API",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "jobfinder",
+    "job",
+    "internship"
+  ],
+  "author": "Siam Talukder",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^7.6.0",
+    "mongoose": "^8.18.0"
+  }
+}
