@@ -1,26 +1,23 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FiArrowRight,
   FiBriefcase,
-  FiUser,
   FiMail,
   FiLock,
 } from "react-icons/fi";
 
-function Register() {
+function Login() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    name: "",
     email: "",
     password: "",
-    role: "candidate",
   });
 
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -29,60 +26,89 @@ function Register() {
       ...prev,
       [name]: value,
     }));
+
+    if (error) {
+      setError("");
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
-    setSuccess("");
 
-    if (!formData.name || !formData.email || !formData.password) {
-      setError("Please fill in all required fields.");
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password;
+
+    // Validation
+    if (!email) {
+      setError("Please enter your email address.");
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (!password) {
+      setError("Please enter your password.");
       return;
     }
+
+    setLoading(true);
 
     try {
-      setLoading(true);
-
       const response = await fetch(
-        "http://localhost:5000/api/auth/register",
+        "http://localhost:5000/api/auth/login",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            email,
+            password,
+          }),
         }
       );
 
-      const data = await response.json();
+      let data;
 
-      if (!response.ok) {
-        throw new Error(data.message || "Registration failed.");
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Invalid response from server.");
       }
 
-      setSuccess(
-        data.message || "Registration successful! Redirecting to login..."
+      // Backend error
+      if (!response.ok) {
+        setError(data.message || "Invalid email or password.");
+        return;
+      }
+
+      // Check authentication data
+      if (!data.token || !data.user) {
+        setError(
+          "Login successful, but authentication data was not received."
+        );
+        return;
+      }
+
+      // Save JWT token
+      localStorage.setItem("jobfinder_token", data.token);
+
+      // Save user
+      localStorage.setItem(
+        "jobfinder_user",
+        JSON.stringify(data.user)
       );
 
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        role: "candidate",
-      });
+      // Login successful → Home
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error("Login error:", err);
 
-      setTimeout(() => {
-        navigate("/login");
-      }, 1500);
-    } catch (error) {
-      setError(error.message || "Something went wrong.");
+      setError(
+        err.message === "Invalid response from server."
+          ? err.message
+          : "Unable to connect to server. Make sure the backend is running."
+      );
     } finally {
       setLoading(false);
     }
@@ -108,18 +134,18 @@ function Register() {
 
             <div className="mt-20">
               <h1 className="text-4xl font-extrabold leading-tight xl:text-5xl">
-                Build your future with JobFinder.
+                Welcome back to JobFinder.
               </h1>
 
               <p className="mt-5 max-w-md leading-7 opacity-80">
-                Create your account and start discovering opportunities that
-                match your skills and career goals.
+                Sign in to discover new opportunities, manage
+                your applications, and grow your career.
               </p>
             </div>
           </div>
 
           <p className="text-sm opacity-70">
-            Create your profile. Discover opportunities. Grow your career.
+            Find opportunities. Build connections. Grow your career.
           </p>
         </div>
 
@@ -144,62 +170,31 @@ function Register() {
             {/* Heading */}
             <div>
               <h2 className="text-3xl font-bold sm:text-4xl">
-                Create account
+                Welcome back
               </h2>
 
               <p className="mt-2 text-base-content/60">
-                Join JobFinder and start your journey.
+                Login to continue to your JobFinder account.
               </p>
             </div>
 
             {/* Error */}
             {error && (
-              <div className="alert alert-error mt-6 text-sm">
-                {error}
+              <div className="alert alert-error mt-6">
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Success */}
-            {success && (
-              <div className="alert alert-success mt-6 text-sm">
-                {success}
-              </div>
-            )}
-
-            {/* Form */}
+            {/* Login Form */}
             <form
               onSubmit={handleSubmit}
               className="mt-8 space-y-5"
             >
 
-              {/* Name */}
-              <div>
-                <label
-                  htmlFor="name"
-                  className="mb-2 block text-sm font-medium"
-                >
-                  Full Name
-                </label>
-
-                <label className="input input-bordered flex w-full items-center gap-3">
-                  <FiUser className="shrink-0 text-base-content/50" />
-
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="Your full name"
-                    className="grow"
-                  />
-                </label>
-              </div>
-
               {/* Email */}
               <div>
                 <label
-                  htmlFor="register-email"
+                  htmlFor="login-email"
                   className="mb-2 block text-sm font-medium"
                 >
                   Email Address
@@ -209,84 +204,63 @@ function Register() {
                   <FiMail className="shrink-0 text-base-content/50" />
 
                   <input
-                    id="register-email"
+                    id="login-email"
                     name="email"
                     type="email"
-                    value={formData.email}
-                    onChange={handleChange}
                     placeholder="you@example.com"
                     className="grow"
+                    value={formData.email}
+                    onChange={handleChange}
+                    disabled={loading}
+                    autoComplete="email"
                   />
                 </label>
               </div>
 
               {/* Password */}
               <div>
-                <label
-                  htmlFor="register-password"
-                  className="mb-2 block text-sm font-medium"
-                >
-                  Password
-                </label>
+                <div className="mb-2 flex items-center justify-between">
+                  <label
+                    htmlFor="login-password"
+                    className="block text-sm font-medium"
+                  >
+                    Password
+                  </label>
+
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
 
                 <label className="input input-bordered flex w-full items-center gap-3">
                   <FiLock className="shrink-0 text-base-content/50" />
 
                   <input
-                    id="register-password"
+                    id="login-password"
                     name="password"
                     type="password"
+                    placeholder="Enter your password"
+                    className="grow"
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="Create a password"
-                    className="grow"
+                    disabled={loading}
+                    autoComplete="current-password"
                   />
                 </label>
               </div>
 
-              {/* Role */}
-              <div>
-                <label
-                  htmlFor="role"
-                  className="mb-2 block text-sm font-medium"
-                >
-                  Account Type
-                </label>
-
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  className="select select-bordered w-full"
-                >
-                  <option value="candidate">
-                    Candidate
-                  </option>
-
-                  <option value="employer">
-                    Employer
-                  </option>
-                </select>
-              </div>
-
-              {/* Terms */}
-              <label className="flex cursor-pointer items-start gap-3 text-sm leading-5">
+              {/* Remember Me */}
+              <label className="flex cursor-pointer items-center gap-3 text-sm">
                 <input
                   type="checkbox"
-                  required
-                  className="checkbox checkbox-primary mt-0.5"
+                  className="checkbox checkbox-primary"
+                  disabled={loading}
                 />
 
-                <span>
-                  I agree to the{" "}
-                  <button
-                    type="button"
-                    className="font-medium text-primary hover:underline"
-                  >
-                    Terms & Conditions
-                  </button>
-                </span>
+                <span>Remember me</span>
               </label>
 
               {/* Submit */}
@@ -297,27 +271,29 @@ function Register() {
               >
                 {loading ? (
                   <>
-                    <span className="loading loading-spinner loading-sm" />
-                    Creating Account...
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Logging in...
                   </>
                 ) : (
                   <>
-                    Create Account
+                    Login
                     <FiArrowRight size={18} />
                   </>
                 )}
               </button>
             </form>
 
+            {/* Register */}
             <p className="mt-7 text-center text-sm text-base-content/60">
-              Already have an account?{" "}
+              Don't have an account?{" "}
               <Link
-                to="/login"
+                to="/register"
                 className="font-semibold text-primary hover:underline"
               >
-                Sign in
+                Create account
               </Link>
             </p>
+
           </div>
         </div>
       </div>
@@ -325,4 +301,5 @@ function Register() {
   );
 }
 
-export default Register;
+export default Login;
+

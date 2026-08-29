@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -18,6 +19,7 @@ function Register() {
     role: "candidate",
   });
 
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,6 +30,10 @@ function Register() {
       ...prev,
       [name]: value,
     }));
+
+    if (error) {
+      setError("");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -36,23 +42,38 @@ function Register() {
     setError("");
 
     // Validation
-    if (!formData.name.trim()) {
+    const name = formData.name.trim();
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password;
+    const role = formData.role;
+
+    if (!name) {
       setError("Please enter your full name.");
       return;
     }
 
-    if (!formData.email.trim()) {
+    if (!email) {
       setError("Please enter your email address.");
       return;
     }
 
-    if (!formData.password) {
+    if (!password) {
       setError("Please enter your password.");
       return;
     }
 
-    if (formData.password.length < 6) {
+    if (password.length < 6) {
       setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (!["candidate", "employer"].includes(role)) {
+      setError("Please select a valid account type.");
+      return;
+    }
+
+    if (!agreeTerms) {
+      setError("Please agree to the Terms & Conditions.");
       return;
     }
 
@@ -66,19 +87,29 @@ function Register() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+            role,
+          }),
         }
       );
 
-      const data = await response.json();
+      let data;
 
-      // Backend error
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Invalid response from server.");
+      }
+
       if (!response.ok) {
         setError(data.message || "Registration failed.");
         return;
       }
 
-      // Check token and user
+      // Backend must return token + user
       if (!data.token || !data.user) {
         setError(
           "Registration successful, but authentication data was not received."
@@ -86,26 +117,24 @@ function Register() {
         return;
       }
 
-      // Save token
-      localStorage.setItem(
-        "jobfinder_token",
-        data.token
-      );
+      // Save JWT token
+      localStorage.setItem("jobfinder_token", data.token);
 
-      // Save user
+      // Save logged-in user
       localStorage.setItem(
         "jobfinder_user",
         JSON.stringify(data.user)
       );
 
-      // IMPORTANT:
-      // Registration successful → Home page
+      // Registration successful → Home
       navigate("/", { replace: true });
-    } catch (error) {
-      console.error("Registration error:", error);
+    } catch (err) {
+      console.error("Registration error:", err);
 
       setError(
-        "Unable to connect to server. Make sure the backend is running."
+        err.message === "Invalid response from server."
+          ? err.message
+          : "Unable to connect to server. Make sure the backend is running."
       );
     } finally {
       setLoading(false);
@@ -126,7 +155,6 @@ function Register() {
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-content text-primary">
                 <FiBriefcase size={20} />
               </span>
-
               JobFinder
             </Link>
 
@@ -185,7 +213,7 @@ function Register() {
               </div>
             )}
 
-            {/* Form */}
+            {/* Register Form */}
             <form
               onSubmit={handleSubmit}
               className="mt-8 space-y-5"
@@ -212,6 +240,7 @@ function Register() {
                     value={formData.name}
                     onChange={handleChange}
                     disabled={loading}
+                    autoComplete="name"
                   />
                 </label>
               </div>
@@ -237,6 +266,7 @@ function Register() {
                     value={formData.email}
                     onChange={handleChange}
                     disabled={loading}
+                    autoComplete="email"
                   />
                 </label>
               </div>
@@ -262,6 +292,7 @@ function Register() {
                     value={formData.password}
                     onChange={handleChange}
                     disabled={loading}
+                    autoComplete="new-password"
                   />
                 </label>
               </div>
@@ -298,7 +329,10 @@ function Register() {
                 <input
                   type="checkbox"
                   className="checkbox checkbox-primary mt-0.5"
-                  required
+                  checked={agreeTerms}
+                  onChange={(e) =>
+                    setAgreeTerms(e.target.checked)
+                  }
                   disabled={loading}
                 />
 
@@ -319,12 +353,16 @@ function Register() {
                 disabled={loading}
                 className="btn btn-primary w-full rounded-xl"
               >
-                {loading
-                  ? "Creating Account..."
-                  : "Create Account"}
-
-                {!loading && (
-                  <FiArrowRight size={18} />
+                {loading ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Creating Account...
+                  </>
+                ) : (
+                  <>
+                    Create Account
+                    <FiArrowRight size={18} />
+                  </>
                 )}
               </button>
             </form>
@@ -348,3 +386,4 @@ function Register() {
 }
 
 export default Register;
+
